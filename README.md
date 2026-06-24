@@ -50,6 +50,10 @@ README.md
 
 No borres ni sustituyas `/data/products.json`.
 
+## Diseño móvil compacto
+
+La pantalla de partida está optimizada para móvil sin scroll: producto, apuesta, teclado numérico y botón de envío quedan dentro de `100dvh`. En móvil se oculta el mini-ranking durante la ronda para priorizar la jugabilidad.
+
 ## Flujo de juego
 
 1. Cada jugador escribe su nombre.
