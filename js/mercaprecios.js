@@ -240,14 +240,35 @@ function normalizeSettings(settings = {}) {
   };
 }
 
+function selectedCategoryInputs() {
+  return [...document.querySelectorAll('#category-list input:checked')];
+}
+
+function updateCategorySummary() {
+  const selected = selectedCategoryInputs().map(input => input.value);
+  const total = state.categories.length;
+  const allMode = selected.length === 0;
+  const countText = allMode ? 'Todas' : `${selected.length} elegida${selected.length === 1 ? '' : 's'}`;
+  const examples = selected.slice(0, 2).join(' · ');
+
+  $('category-count') && ($('category-count').textContent = countText);
+  $('category-mode-hint') && ($('category-mode-hint').textContent = allMode ? `${total} categorías` : countText);
+  $('category-summary') && ($('category-summary').textContent = allMode
+    ? `Se usarán todas las categorías (${total}).`
+    : `Solo saldrán productos de ${examples}${selected.length > 2 ? ` y ${selected.length - 2} más` : ''}.`);
+  $('category-all-button')?.classList.toggle('active', allMode);
+  $('category-custom-button')?.classList.toggle('active', !allMode);
+}
+
 function syncSettingsFromUI() {
-  const selected = [...document.querySelectorAll('#category-list input:checked')].map(input => input.value);
+  const selected = selectedCategoryInputs().map(input => input.value);
   state.settings = normalizeSettings({
     articles: $('cfg-articles')?.value,
     roundSeconds: $('cfg-time')?.value,
     justo: $('cfg-justo')?.checked,
     categories: selected,
   });
+  updateCategorySummary();
   return state.settings;
 }
 
@@ -259,6 +280,7 @@ function applySettingsToUI(settings = state.settings) {
   document.querySelectorAll('#category-list input').forEach(input => {
     input.checked = normalized.categories.includes(input.value);
   });
+  updateCategorySummary();
 }
 
 function saveActiveSession() {
@@ -295,12 +317,15 @@ function renderCategoryList() {
   const root = $('category-list');
   if (!root) return;
   root.innerHTML = state.categories.map(category => {
-    const rgba = Array.isArray(category.color) ? `rgba(${category.color[0]},${category.color[1]},${category.color[2]},.22)` : 'rgba(255,255,255,.06)';
-    return `<label class="category-pill cursor-pointer rounded-full border border-white/10 px-3 py-2 text-xs font-bold text-emerald-100/70 transition" style="background:${rgba}">
+    const rgba = Array.isArray(category.color) ? `rgba(${category.color[0]},${category.color[1]},${category.color[2]},.16)` : 'rgba(255,255,255,.055)';
+    return `<label class="category-pill cursor-pointer rounded-2xl border border-white/10 px-3 py-2.5 text-xs font-bold text-emerald-100/75 transition" style="background:${rgba}" data-category-name="${escapeHTML(category.name).toLowerCase()}">
       <input type="checkbox" class="sr-only" value="${escapeHTML(category.name)}" />
-      ${escapeHTML(category.name)} <span class="opacity-45">${Number(category.count || 0) || ''}</span>
+      <span class="category-check w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[11px] font-black flex-shrink-0">✓</span>
+      <span class="min-w-0 flex-1 truncate">${escapeHTML(category.name)}</span>
+      <span class="opacity-45 text-[11px]">${Number(category.count || 0) || ''}</span>
     </label>`;
   }).join('');
+  updateCategorySummary();
 }
 
 function playerAvatar(player) {
@@ -954,6 +979,19 @@ window.App = {
   clearCategories() {
     document.querySelectorAll('#category-list input').forEach(input => { input.checked = false; });
     App.syncSettings();
+  },
+
+  focusCategories() {
+    $('category-search')?.focus();
+    $('category-list')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!selectedCategoryInputs().length) toast('Marca una o varias categorías, o deja Todas.', '🛒');
+  },
+
+  filterCategories(query = '') {
+    const normalized = String(query).trim().toLowerCase();
+    document.querySelectorAll('#category-list .category-pill').forEach(label => {
+      label.classList.toggle('hidden', normalized && !label.dataset.categoryName.includes(normalized));
+    });
   },
 
   syncSettings() {

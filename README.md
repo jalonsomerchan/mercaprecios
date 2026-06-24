@@ -7,36 +7,19 @@ Juego multijugador web para adivinar el precio de artículos de Mercadona, inspi
 - SPA en `index.html` con Tailwind por CDN.
 - `js/GameAPI.js` usando `https://alon.one/juegos/api`.
 - `js/mercaprecios.js` con salas, jugadores, estado compartido, IttySockets y fallback por polling.
-- Carga del catálogo real desde `data/products.json` del propio repositorio.
-- Carga de categorías desde `data/categories.json`; si faltan, las genera a partir de los productos.
-- Despliegue directo en GitHub Pages mediante `.github/workflows/pages.yml`.
-- `.nojekyll` para servir correctamente archivos y carpetas estáticas.
+- Carga del catálogo real desde `data/products.json` del propio repositorio `jalonsomerchan/mercaprecios`.
+- Carga de categorías desde `data/categories.json`; si faltan, las genera a partir de `top_category`.
 
-## Despliegue en GitHub Pages
+## Importante sobre los datos
 
-El repositorio publica la raíz del proyecto como sitio estático cada vez que se hace push a `main`.
-
-En GitHub Pages deja la configuración así:
-
-- **Source:** GitHub Actions
-- **Branch:** no hace falta elegir rama, lo gestiona el workflow
-
-URL esperada:
-
-```txt
-https://jalonsomerchan.github.io/mercaprecios/
-```
-
-## Datos
+Este ZIP no incluye `data/products.json` ni `data/categories.json` para no sobrescribir los ficheros reales que ya existen en el repositorio.
 
 El juego carga directamente:
 
 ```txt
-data/products.json
-data/categories.json
+/data/products.json
+/data/categories.json
 ```
-
-No se copia el catálogo dentro del JavaScript: se lee en tiempo de ejecución para que actualizar los JSON actualice el juego automáticamente.
 
 El formato soportado es el que ya tiene el repo:
 
@@ -54,19 +37,18 @@ El formato soportado es el que ya tiene el repo:
 
 También acepta variantes como `display_name`, `price_instructions.unit_price`, `image`, `image_url` o `share_url`, pero la fuente principal es `data/products.json`.
 
-## Desarrollo local
+## Subida a GitHub
 
-Abre el proyecto con un servidor local para que `fetch()` pueda leer los JSON:
-
-```bash
-python3 -m http.server 8080
-```
-
-Después visita:
+Copia estos archivos en la raíz del repositorio `jalonsomerchan/mercaprecios`, manteniendo la carpeta `/data` actual:
 
 ```txt
-http://localhost:8080/
+index.html
+js/GameAPI.js
+js/mercaprecios.js
+README.md
 ```
+
+No borres ni sustituyas `/data/products.json`.
 
 ## Diseño móvil compacto
 
