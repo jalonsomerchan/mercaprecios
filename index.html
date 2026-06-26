@@ -2,9 +2,9 @@
 <html lang="es" class="h-full">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>MercaPrecios</title>
-  <meta name="description" content="Juego multijugador para adivinar el precio de productos de Mercadona." />
+  <meta name="description" content="Juego multijugador e individual para adivinar precios reales de Mercadona." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -20,317 +20,82 @@
           fontFamily: { game: ['Outfit', 'system-ui', 'sans-serif'] }
         }
       }
-    }
+    };
   </script>
   <style>
-    * { -webkit-tap-highlight-color: transparent; box-sizing:border-box; }
-    html { min-height:100%; overflow-x:hidden; text-size-adjust:100%; -webkit-text-size-adjust:100%; }
-    body { min-height:100%; overscroll-behavior:none; touch-action:manipulation; }
-    button, input { font:inherit; touch-action:manipulation; }
-    button { user-select:none; -webkit-user-select:none; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html { min-height: 100%; overflow-x: hidden; text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
+    body { min-height: 100%; overscroll-behavior: none; touch-action: manipulation; }
+    button, input { font: inherit; touch-action: manipulation; }
+    button { user-select: none; -webkit-user-select: none; }
     .screen { display: none; }
-    .screen.active { display: flex; animation: screenIn .32s cubic-bezier(.34,1.4,.64,1) both; }
+    .screen.active { display: flex; animation: screenIn .28s cubic-bezier(.34,1.35,.64,1) both; }
     @keyframes screenIn { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-    @keyframes pop { 0% { opacity:0; transform:scale(.55) translateY(12px); } 72% { transform:scale(1.045) translateY(-2px); } 100% { opacity:1; transform:scale(1) translateY(0); } }
-    .pop { animation: pop .45s cubic-bezier(.18,1.25,.32,1) both; }
+    @keyframes pop { 0% { opacity:0; transform:scale(.58) translateY(14px); } 72% { transform:scale(1.045) translateY(-2px); } 100% { opacity:1; transform:scale(1) translateY(0); } }
     @keyframes shake { 0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(4px)} }
-    .shake { animation: shake .38s ease; }
     @keyframes orbFloat { 0%,100%{ transform:translateY(0) scale(1); } 50%{ transform:translateY(-26px) scale(1.08); } }
+    @keyframes confettiFall { 0%{ transform:translateY(-10px) rotate(0deg); opacity:1; } 100%{ transform:translateY(110vh) rotate(760deg); opacity:0; } }
+    @keyframes productDrop { 0%{ opacity:0; transform:translateY(-26px) scale(.9) rotate(-2deg); filter:blur(10px); } 100%{ opacity:1; transform:translateY(0) scale(1) rotate(0); filter:blur(0); } }
+    @keyframes curtainOpen { 0% { opacity: 0; transform: scaleX(.12); filter: blur(16px); } 55% { opacity: 1; transform: scaleX(1.08); } 100% { opacity: 1; transform: scaleX(1); filter: blur(0); } }
+    @keyframes spotSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes glowSweep { 0%{ transform:translateX(-130%) skewX(-18deg); } 100%{ transform:translateX(150%) skewX(-18deg); } }
+    .pop { animation: pop .45s cubic-bezier(.18,1.25,.32,1) both; }
+    .shake { animation: shake .38s ease; }
+    .product-drop { animation: productDrop .48s cubic-bezier(.18,1.25,.32,1) both; }
     .orb { position:absolute; border-radius:999px; filter:blur(72px); pointer-events:none; }
     .glass { background:rgba(8,24,17,.78); border:1px solid rgba(255,255,255,.08); backdrop-filter:blur(24px); box-shadow:0 24px 80px rgba(0,0,0,.26); }
     .panel { background:rgba(5,12,9,.72); border:1px solid rgba(255,255,255,.07); backdrop-filter:blur(20px); }
     .btn-brand { background:linear-gradient(135deg,#00A651,#13C86F); transition: transform .12s, filter .18s, box-shadow .18s; box-shadow:0 16px 42px rgba(0,166,81,.24); }
     .btn-brand:hover { filter:brightness(1.08); box-shadow:0 18px 55px rgba(0,166,81,.34); }
-    .btn-brand:active { transform:scale(.98); }
+    .btn-brand:active, .btn-soft:active, .choice-card:active { transform:scale(.98); }
     .btn-soft { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.08); transition:background .18s, transform .12s; }
     .btn-soft:hover { background:rgba(255,255,255,.13); }
-    .btn-soft:active { transform:scale(.98); }
     .text-gradient { background:linear-gradient(135deg,#F8FFE9,#42E28A 42%,#FFE36E); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
     .mercadona-title { text-shadow:0 0 34px rgba(66,226,138,.24); }
-    .toggle { position:relative; display:inline-block; width:52px; height:30px; flex-shrink:0; cursor:pointer; touch-action:manipulation; }
+    .mode-card { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.09); transition:transform .12s, background .18s, border-color .18s, box-shadow .18s; }
+    .toggle { position:relative; display:inline-block; width:52px; height:30px; flex-shrink:0; cursor:pointer; }
     .toggle input { position:absolute; inset:0; z-index:2; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; appearance:none; -webkit-appearance:none; }
     .toggle-track { position:absolute; inset:0; border-radius:999px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.08); transition:.2s; pointer-events:none; }
     .toggle-track::after { content:''; position:absolute; width:22px; height:22px; left:3px; top:3px; border-radius:50%; background:white; transition:.2s; box-shadow:0 3px 10px rgba(0,0,0,.35); }
     .toggle input:checked + .toggle-track { background:#00A651; box-shadow:0 0 24px rgba(0,166,81,.38); }
     .toggle input:checked + .toggle-track::after { transform:translateX(22px); }
-    @keyframes pulseDot { 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:.35; transform:scale(.75); } }
-    .pulse-dot { animation:pulseDot 1.15s ease infinite; }
-    @keyframes toastIn { from{ opacity:0; transform:translateX(-50%) translateY(10px) scale(.98); } to{ opacity:1; transform:translateX(-50%) translateY(0) scale(1); } }
-    .toast-visible { opacity:1!important; animation:toastIn .2s ease both; }
-    @keyframes confettiFall { 0%{ transform:translateY(-10px) rotate(0deg); opacity:1; } 100%{ transform:translateY(110vh) rotate(760deg); opacity:0; } }
-    .confetti-piece { position:fixed; top:0; pointer-events:none; z-index:200; animation:confettiFall linear forwards; }
-    @keyframes productDrop { 0%{ opacity:0; transform:translateY(-26px) scale(.9) rotate(-2deg); filter:blur(10px); } 100%{ opacity:1; transform:translateY(0) scale(1) rotate(0); filter:blur(0); } }
-    .product-drop { animation:productDrop .48s cubic-bezier(.18,1.25,.32,1) both; }
-    @keyframes glowSweep { 0%{ transform:translateX(-130%) skewX(-18deg); } 100%{ transform:translateX(150%) skewX(-18deg); } }
-    .winner-card { position:relative; overflow:hidden; animation:pop .55s cubic-bezier(.18,1.25,.32,1) both; }
-    .winner-card::after { content:''; position:absolute; top:0; bottom:0; left:0; width:42%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.17),transparent); animation:glowSweep 1.1s ease-out .1s both; }
-    .category-mode { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.09); transition:transform .12s, background .18s, border-color .18s, box-shadow .18s; }
-    .category-mode:hover { background:rgba(255,255,255,.1); }
-    .category-mode.active { background:rgba(0,166,81,.22); border-color:rgba(66,226,138,.55); box-shadow:0 0 0 1px rgba(66,226,138,.22), 0 14px 38px rgba(0,166,81,.14); }
+    .mode-card.active { background:rgba(0,166,81,.24); border-color:rgba(66,226,138,.62); box-shadow:0 0 0 1px rgba(66,226,138,.22), 0 14px 38px rgba(0,166,81,.14); }
     .category-pill { display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.055); }
     .category-pill .category-check { opacity:.28; transform:scale(.9); transition:.18s; }
     .category-pill:has(input:checked) { background:rgba(0,166,81,.25)!important; border-color:rgba(66,226,138,.72); color:#dcfce7; box-shadow:0 10px 32px rgba(0,166,81,.13); }
     .category-pill:has(input:checked) .category-check { opacity:1; transform:scale(1); background:#42E28A; color:#03120B; }
-    .key {
-      min-height:58px;
-      transform:translateZ(0);
-      will-change:transform;
-    }
-    .key.key-active {
-      background:rgba(66,226,138,.28)!important;
-      border-color:rgba(66,226,138,.58)!important;
-      transform:translateY(1px) scale(.96);
-      box-shadow:0 0 0 2px rgba(66,226,138,.18) inset;
-    }
+    .key { min-height:56px; transform:translateZ(0); will-change:transform; }
+    .key.key-active { background:rgba(66,226,138,.28)!important; border-color:rgba(66,226,138,.58)!important; transform:translateY(1px) scale(.96); box-shadow:0 0 0 2px rgba(66,226,138,.18) inset; }
     .price-display { font-variant-numeric: tabular-nums; }
     .scrollbar-none { scrollbar-width:none; }
     .scrollbar-none::-webkit-scrollbar { display:none; }
+    .confetti-piece { position:fixed; top:0; pointer-events:none; z-index:200; animation:confettiFall linear forwards; }
+    .winner-card { position:relative; overflow:hidden; animation:pop .55s cubic-bezier(.18,1.25,.32,1) both; }
+    .winner-card::after { content:''; position:absolute; top:0; bottom:0; left:0; width:42%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.17),transparent); animation:glowSweep 1.1s ease-out .1s both; }
+    .show-stage { position:relative; overflow:hidden; animation:curtainOpen .68s cubic-bezier(.18,1.25,.32,1) both; }
+    .show-stage::before { content:''; position:absolute; inset:-35%; background:conic-gradient(from 120deg, transparent, rgba(255,227,110,.18), transparent, rgba(66,226,138,.16), transparent); animation:spotSpin 7s linear infinite; opacity:.9; }
+    .show-stage > * { position:relative; z-index:1; }
+    .choice-card, .order-chip { transition: transform .15s, background .18s, border-color .18s, box-shadow .18s; }
+    .choice-card.selected, .order-chip.selected { background:rgba(0,166,81,.26)!important; border-color:rgba(66,226,138,.7)!important; box-shadow:0 16px 42px rgba(0,166,81,.18); }
+    .order-slot { min-height:58px; border:1px dashed rgba(255,255,255,.14); }
+    .medal-badge { background:linear-gradient(135deg,rgba(255,227,110,.22),rgba(66,226,138,.18)); border:1px solid rgba(255,227,110,.38); }
     @media (max-width: 640px) {
-      html, body { min-height:100%; width:100%; overflow-x:hidden; }
       input, select, textarea { font-size:16px!important; }
-      #screen-game.active {
-        height:100svh;
-        min-height:100svh;
-        overflow:hidden;
-        padding:calc(7px + env(safe-area-inset-top)) 8px calc(7px + env(safe-area-inset-bottom));
-        gap:6px;
-      }
-      #screen-game > header {
-        flex-shrink:0;
-        border-radius:18px;
-        padding:7px 10px;
-        min-height:44px;
-      }
-      #screen-game > header p:first-child { font-size:10px; letter-spacing:.12em; }
-      #screen-game > header .mt-2 { margin-top:4px!important; }
-      #screen-game > header .h-2 { height:5px!important; }
-      #screen-game > header .w-36 { width:128px!important; }
-      #timer-label { font-size:22px!important; line-height:1; }
-      #screen-game > main {
-        display:flex!important;
-        flex-direction:column;
-        gap:6px;
-        flex:1 1 auto;
-        min-height:0;
-        width:100%;
-      }
-      #product-card {
-        flex:1 1 auto;
-        min-height:0;
-        border-radius:20px!important;
-        padding:8px 9px!important;
-        justify-content:stretch;
-      }
-      #product-card .absolute { display:none; }
-      #product-card .product-drop {
-        height:100%;
-        display:flex;
-        flex-direction:column;
-        align-items:center;
-        justify-content:center;
-        gap:6px;
-        width:100%;
-        max-width:none;
-      }
-      #product-category {
-        order:2;
-        max-width:100%;
-        margin:2px 0 0!important;
-        padding:4px 9px!important;
-        font-size:9px!important;
-        line-height:1.05;
-        letter-spacing:.11em!important;
-        white-space:nowrap;
-        overflow:hidden;
-        text-overflow:ellipsis;
-      }
-      #product-card .product-image-frame {
-        order:1;
-        width:clamp(160px,35svh,245px)!important;
-        height:clamp(160px,35svh,245px)!important;
-        border-radius:24px!important;
-        padding:10px!important;
-        box-shadow:0 14px 40px rgba(0,0,0,.34)!important;
-        flex-shrink:0;
-      }
-      #product-name {
-        order:3;
-        margin-top:0!important;
-        font-size:clamp(16px,4.5vw,21px)!important;
-        line-height:1.08!important;
-        display:-webkit-box;
-        -webkit-line-clamp:2;
-        -webkit-box-orient:vertical;
-        overflow:hidden;
-        text-align:center;
-        max-width:100%;
-      }
-      #product-path { display:none!important; }
-      #screen-game aside {
-        flex:0 0 auto;
-        border-radius:18px!important;
-        padding:8px!important;
-        gap:6px!important;
-      }
-      #screen-game aside > div:first-child {
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:8px;
-      }
-      #screen-game aside > div:first-child > p:first-child {
-        font-size:10px;
-        letter-spacing:.12em;
-        white-space:nowrap;
-      }
-      #answer-display {
-        margin-top:0!important;
-        font-size:31px!important;
-        line-height:1!important;
-        text-align:right;
-        white-space:nowrap;
-      }
-      #answer-helper { display:none!important; }
-      #keypad { gap:5px!important; }
-      .key {
-        min-height:38px!important;
-        border-radius:13px!important;
-        font-size:20px!important;
-      }
-      #keypad [data-key="clear"] { font-size:12px!important; }
-      #submit-answer {
-        padding-top:10px!important;
-        padding-bottom:10px!important;
-        border-radius:15px!important;
-        font-size:15px!important;
-      }
-      #answers-status {
-        min-height:16px!important;
-        font-size:11px!important;
-        line-height:1.15;
-      }
-      #mini-scores { display:none!important; }
-      #screen-reveal.active {
-        height:100svh;
-        min-height:100svh;
-        overflow:hidden;
-        padding:calc(8px + env(safe-area-inset-top)) 8px calc(76px + env(safe-area-inset-bottom));
-        gap:8px;
-      }
-      #screen-reveal > header {
-        flex-shrink:0;
-        border-radius:20px;
-        padding:10px 12px;
-      }
-      #screen-reveal > header h2 {
-        font-size:clamp(18px,5vw,24px)!important;
-        line-height:1.05;
-        display:-webkit-box;
-        -webkit-line-clamp:2;
-        -webkit-box-orient:vertical;
-        overflow:hidden;
-      }
-      #screen-reveal > header .text-4xl { font-size:30px!important; }
-      #screen-reveal > main {
-        display:flex!important;
-        flex-direction:column;
-        gap:8px;
-        flex:1 1 auto;
-        min-height:0;
-        overflow:hidden;
-      }
-      #screen-reveal > main > section:first-child {
-        flex:0 0 auto;
-        border-radius:20px!important;
-        padding:10px!important;
-        display:grid;
-        grid-template-columns:112px minmax(0,1fr);
-        gap:10px;
-        align-items:center;
-        text-align:left;
-      }
-      #screen-reveal > main > section:first-child > div:first-child {
-        width:112px!important;
-        height:112px!important;
-        border-radius:20px!important;
-        padding:8px!important;
-      }
-      #winner-box {
-        margin-top:0!important;
-        padding:12px!important;
-        border-radius:20px!important;
-      }
-      #winner-box .text-5xl { font-size:28px!important; margin:.2rem 0!important; }
-      #winner-box .text-3xl { font-size:20px!important; line-height:1.05!important; }
-      #screen-reveal > main > section:last-child {
-        flex:1 1 auto;
-        min-height:0!important;
-        border-radius:20px!important;
-        padding:10px!important;
-        overflow:hidden;
-      }
-      #screen-reveal > main > section:last-child > .flex.items-center { margin-bottom:8px!important; }
-      #screen-reveal > main > section:last-child h3 { font-size:18px!important; }
-      #reveal-results { min-height:0; padding-bottom:2px; }
-      #reveal-action-bar {
-        position:fixed;
-        left:8px;
-        right:8px;
-        bottom:calc(8px + env(safe-area-inset-bottom));
-        z-index:80;
-        margin:0!important;
-        padding:0!important;
-        border:0!important;
-      }
-      #next-round-button {
-        width:100%;
-        border-radius:18px!important;
-        padding:16px 18px!important;
-        box-shadow:0 18px 48px rgba(0,166,81,.38), 0 0 0 1px rgba(255,255,255,.12) inset;
-      }
-      #guest-next-wait {
-        background:rgba(8,24,17,.94);
-        border:1px solid rgba(255,255,255,.1);
-        border-radius:18px;
-        padding:14px!important;
-        backdrop-filter:blur(18px);
-      }
-      .mobile-tight { padding-left:8px!important; padding-right:8px!important; }
+      #screen-game.active { min-height:100svh; padding:calc(7px + env(safe-area-inset-top)) 8px calc(7px + env(safe-area-inset-bottom)); gap:6px; overflow:hidden; }
+      #screen-game > main { display:flex!important; flex-direction:column; gap:6px; flex:1 1 auto; min-height:0; width:100%; }
+      #game-content { flex:1 1 auto; min-height:0; overflow:hidden; }
+      .key { min-height:38px!important; border-radius:13px!important; font-size:20px!important; }
+      #answer-display { font-size:30px!important; }
+      #product-area img, #reveal-image { max-height:28svh!important; }
+      #screen-reveal.active { min-height:100svh; overflow:auto; padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+      #screen-final.active { min-height:100svh; overflow:auto; }
     }
-
-    @media (max-width: 640px) and (max-height: 700px) {
-      #screen-game.active { padding-top:6px; padding-bottom:6px; gap:5px; }
-      #screen-game > header { min-height:40px; padding:6px 9px; }
-      #screen-game > header .h-2 { height:4px!important; }
-      #timer-label { font-size:20px!important; }
-      #screen-game > main { gap:5px; }
-      #product-card { padding:6px 8px!important; border-radius:17px!important; }
-      #product-card .product-drop { gap:4px; }
-      #product-card .product-image-frame { width:clamp(128px,30svh,174px)!important; height:clamp(128px,30svh,174px)!important; padding:7px!important; border-radius:19px!important; }
-      #product-category { font-size:8px!important; padding:3px 7px!important; margin-top:1px!important; }
-      #product-name { font-size:clamp(14px,4vw,18px)!important; -webkit-line-clamp:2; }
-      #screen-game aside { padding:7px!important; gap:5px!important; }
-      #answer-display { font-size:28px!important; }
-      .key { min-height:34px!important; border-radius:12px!important; font-size:18px!important; }
-      #submit-answer { padding-top:8px!important; padding-bottom:8px!important; font-size:14px!important; }
-      #answers-status { min-height:14px!important; font-size:10px!important; }
-      #screen-reveal.active { padding-top:6px; padding-bottom:calc(70px + env(safe-area-inset-bottom)); gap:6px; }
-      #screen-reveal > header { padding:8px 10px; }
-      #screen-reveal > header h2 { font-size:18px!important; }
-      #screen-reveal > header .text-4xl { font-size:26px!important; }
-      #screen-reveal > main { gap:6px; }
-      #screen-reveal > main > section:first-child { grid-template-columns:88px minmax(0,1fr); padding:8px!important; gap:8px; }
-      #screen-reveal > main > section:first-child > div:first-child { width:88px!important; height:88px!important; border-radius:17px!important; padding:6px!important; }
-      #winner-box { padding:10px!important; }
-      #winner-box .text-5xl { font-size:24px!important; }
-      #winner-box .text-3xl { font-size:18px!important; }
-      #screen-reveal > main > section:last-child { padding:8px!important; }
-      #reveal-results > div { padding:8px!important; border-radius:16px!important; }
-      #next-round-button { padding:14px 16px!important; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; }
     }
   </style>
 </head>
-<body class="h-full bg-[#03120B] text-white font-game select-none overflow-x-hidden">
+<body class="min-h-full bg-[#03120B] text-white font-game select-none overflow-x-hidden">
   <div class="fixed inset-0 pointer-events-none overflow-hidden">
     <div class="orb w-80 h-80 bg-brand/35 -top-20 -left-20" style="animation:orbFloat 7s ease-in-out infinite"></div>
     <div class="orb w-96 h-96 bg-emerald-800/35 -bottom-28 -right-20" style="animation:orbFloat 9s ease-in-out infinite reverse"></div>
@@ -341,17 +106,18 @@
     <div class="text-center pop">
       <p class="text-xs font-black uppercase tracking-[.42em] text-brand-light/80 mb-2">Mercadona party game</p>
       <h1 class="mercadona-title text-6xl sm:text-7xl font-black tracking-tighter text-gradient">MercaPrecios</h1>
-      <p class="text-emerald-100/55 mt-3 max-w-sm mx-auto">Adivina el precio real de artículos del súper. Gana quien más se acerque.</p>
+      <p class="text-emerald-100/55 mt-3 max-w-md mx-auto">Adivina precios reales, juega en sala o entrena en modo individual con nuevos retos.</p>
     </div>
 
-    <div class="w-full max-w-sm glass rounded-[2rem] p-5 sm:p-6 flex flex-col gap-4 pop" style="animation-delay:.08s">
+    <div class="w-full max-w-md glass rounded-[2rem] p-5 sm:p-6 flex flex-col gap-4 pop" style="animation-delay:.08s">
       <input id="input-username" type="text" maxlength="20" autocomplete="off" placeholder="Tu nombre de jugador"
         class="w-full bg-black/25 border-2 border-white/10 rounded-2xl px-4 py-4 text-center text-xl font-black outline-none focus:border-brand-light focus:ring-4 focus:ring-brand/20 placeholder-white/25 transition"
         onkeydown="if(event.key==='Enter')App.createHomeRoom()" />
       <p id="login-error" class="hidden text-red-200 text-xs text-center font-semibold"></p>
 
-      <div id="login-actions" class="grid grid-cols-2 gap-3">
-        <button id="btn-create-room" onclick="App.createHomeRoom()" class="btn-brand rounded-2xl py-4 font-black uppercase tracking-wider">Crear sala</button>
+      <div id="login-actions" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <button id="btn-solo" onclick="App.startSoloFlow()" class="btn-brand rounded-2xl py-4 font-black uppercase tracking-wider">Individual</button>
+        <button id="btn-create-room" onclick="App.createHomeRoom()" class="btn-soft rounded-2xl py-4 font-black uppercase tracking-wider">Crear sala</button>
         <button onclick="App.showJoinForm()" class="btn-soft rounded-2xl py-4 font-black uppercase tracking-wider">Unirse</button>
       </div>
 
@@ -370,19 +136,20 @@
     <div id="catalog-status" class="text-xs text-emerald-100/45 text-center"></div>
   </section>
 
-  <section id="screen-waiting" class="screen flex-col min-h-screen p-4 sm:p-6 gap-4 relative mobile-tight">
-    <header class="w-full max-w-5xl mx-auto glass rounded-[2rem] px-5 py-4 flex items-center justify-between gap-4">
+  <section id="screen-waiting" class="screen flex-col min-h-screen p-4 sm:p-6 gap-4 relative">
+    <header class="w-full max-w-6xl mx-auto glass rounded-[2rem] px-5 py-4 flex items-center justify-between gap-4">
       <div>
-        <p class="text-xs text-emerald-100/45 font-bold uppercase tracking-widest">Sala</p>
+        <p id="waiting-kicker" class="text-xs text-emerald-100/45 font-bold uppercase tracking-widest">Sala</p>
         <p id="waiting-code" class="font-black text-3xl tracking-[.18em] text-gradient">—</p>
       </div>
       <div class="flex items-center gap-2">
-        <button onclick="App.openShareModal()" class="btn-soft rounded-2xl px-4 py-3 text-sm font-black">Compartir</button>
-        <button onclick="App.exitToHome()" class="hidden sm:block btn-soft rounded-2xl px-4 py-3 text-sm font-black text-emerald-100/70">Salir</button>
+        <span id="realtime-badge" class="hidden sm:inline-flex text-[11px] font-black uppercase rounded-full px-3 py-1 bg-white/10 text-emerald-100/60">API</span>
+        <button id="share-room-button" onclick="App.openShareModal()" class="btn-soft rounded-2xl px-4 py-3 text-sm font-black">Compartir</button>
+        <button onclick="App.exitToHome()" class="btn-soft rounded-2xl px-4 py-3 text-sm font-black text-emerald-100/70">Salir</button>
       </div>
     </header>
 
-    <main class="w-full max-w-5xl mx-auto grid lg:grid-cols-[1.15fr_.85fr] gap-4 flex-1 min-h-0">
+    <main class="w-full max-w-6xl mx-auto grid lg:grid-cols-[1.15fr_.85fr] gap-4 flex-1 min-h-0">
       <section id="admin-settings" class="glass rounded-[2rem] p-5 overflow-y-auto scrollbar-none">
         <div class="flex items-center gap-3 mb-5">
           <div class="w-12 h-12 rounded-2xl bg-brand/20 border border-brand-light/20 flex items-center justify-center text-2xl">🛒</div>
@@ -392,10 +159,10 @@
           </div>
         </div>
 
-        <div class="grid sm:grid-cols-2 gap-3 mb-3">
+        <div class="grid sm:grid-cols-2 gap-3 mb-4">
           <label class="panel rounded-2xl p-4">
-            <span class="text-sm font-bold">Nº de artículos</span>
-            <span class="block text-xs text-emerald-100/45 mt-1">Rondas de la partida</span>
+            <span class="text-sm font-bold">Nº de rondas</span>
+            <span class="block text-xs text-emerald-100/45 mt-1">En relámpago serán 10</span>
             <div class="mt-3 flex items-center gap-2">
               <button onclick="App.adjustSetting('articles', -1)" class="btn-soft rounded-xl w-10 h-10 text-xl font-black">−</button>
               <input id="cfg-articles" type="number" min="3" max="30" value="8" class="w-full bg-black/25 border border-white/10 rounded-xl px-3 py-2 text-center font-black outline-none focus:border-brand-light" />
@@ -405,194 +172,158 @@
 
           <label class="panel rounded-2xl p-4">
             <span class="text-sm font-bold">Tiempo</span>
-            <span class="block text-xs text-emerald-100/45 mt-1">Segundos por artículo</span>
+            <span class="block text-xs text-emerald-100/45 mt-1">En relámpago serán 8 segundos</span>
             <div class="mt-3 flex items-center gap-2">
               <button onclick="App.adjustSetting('roundSeconds', -5)" class="btn-soft rounded-xl w-10 h-10 text-xl font-black">−</button>
-              <input id="cfg-time" type="number" min="10" max="180" value="45" class="w-full bg-black/25 border border-white/10 rounded-xl px-3 py-2 text-center font-black outline-none focus:border-brand-light" />
+              <input id="cfg-time" type="number" min="5" max="180" value="45" class="w-full bg-black/25 border border-white/10 rounded-xl px-3 py-2 text-center font-black outline-none focus:border-brand-light" />
               <button onclick="App.adjustSetting('roundSeconds', 5)" class="btn-soft rounded-xl w-10 h-10 text-xl font-black">+</button>
             </div>
           </label>
         </div>
 
-        <div class="panel rounded-2xl p-4 mb-3 flex items-center justify-between gap-4">
+        <div class="panel rounded-2xl p-4 mb-4 flex items-center justify-between gap-4">
           <div>
             <p class="text-sm font-bold">Modo Precio Justo</p>
-            <p class="text-xs text-emerald-100/45 mt-1">Gana quien más se acerque sin pasarse. Si nadie queda por debajo, gana el más cercano.</p>
+            <p class="text-xs text-emerald-100/45 mt-1">En precios y cesta gana quien más se acerque sin pasarse.</p>
           </div>
-          <label class="toggle" aria-label="Activar modo Precio Justo"><input id="cfg-justo" type="checkbox" checked /><span class="toggle-track"></span></label>
+          <label class="toggle" aria-label="Activar modo Precio Justo">
+            <input id="cfg-justo" type="checkbox" checked />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+        <div class="mb-4">
+          <div class="flex items-end justify-between gap-3 mb-3">
+            <div>
+              <p class="text-xs text-brand-light font-black uppercase tracking-widest">Modo de juego</p>
+              <h3 class="text-xl font-black">Elige el reto</h3>
+            </div>
+            <span id="mode-summary" class="text-xs text-emerald-100/45 font-bold text-right">Precio clásico</span>
+          </div>
+          <div id="mode-list" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3"></div>
         </div>
 
         <div class="panel rounded-2xl p-4">
           <div class="flex items-start justify-between gap-3 mb-3">
             <div>
               <p class="text-sm font-bold">Productos que pueden salir</p>
-              <p class="text-xs text-emerald-100/45 mt-1">Por defecto se usan todas. Toca “Elegir” para limitar la partida.</p>
+              <p id="category-summary" class="text-xs text-emerald-100/45 mt-1">Se usarán todas las categorías.</p>
             </div>
-            <span id="category-count" class="text-xs font-black px-2.5 py-1 rounded-full bg-white/10 text-emerald-100/70 whitespace-nowrap">Todas</span>
+            <button onclick="App.clearCategories()" class="btn-soft rounded-xl px-3 py-2 text-xs font-black">Todas</button>
           </div>
-
-          <div class="grid grid-cols-2 gap-2 mb-3">
-            <button id="category-all-button" type="button" onclick="App.clearCategories()" class="category-mode active rounded-2xl p-3 text-left">
-              <span class="block text-sm font-black">Todas</span>
-              <span class="block text-[11px] text-emerald-100/50 mt-0.5">Catálogo completo</span>
-            </button>
-            <button id="category-custom-button" type="button" onclick="App.focusCategories()" class="category-mode rounded-2xl p-3 text-left">
-              <span class="block text-sm font-black">Elegir</span>
-              <span id="category-mode-hint" class="block text-[11px] text-emerald-100/50 mt-0.5">0 seleccionadas</span>
-            </button>
-          </div>
-
-          <div id="category-summary" class="rounded-2xl bg-black/20 border border-white/10 px-3 py-2 text-xs text-emerald-100/60 mb-3">Se usarán todas las categorías.</div>
-
-          <input id="category-search" type="search" placeholder="Buscar categoría…" autocomplete="off" oninput="App.filterCategories(this.value)"
-            class="w-full bg-black/25 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-light focus:ring-4 focus:ring-brand/15 placeholder-white/25 mb-3" />
-          <div id="category-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1 scrollbar-none"></div>
+          <input id="category-search" type="search" placeholder="Buscar categoría" oninput="App.filterCategories(this.value)"
+            class="w-full bg-black/25 border border-white/10 rounded-xl px-3 py-2 mb-3 text-sm font-bold outline-none focus:border-brand-light" />
+          <div id="category-list" class="grid sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1 scrollbar-none"></div>
         </div>
+
+        <button id="start-button" onclick="App.startGame()" class="btn-brand w-full rounded-2xl py-4 mt-4 text-lg font-black uppercase tracking-widest">Empezar partida</button>
       </section>
 
-      <section class="glass rounded-[2rem] p-5 flex flex-col min-h-[360px]">
+      <aside class="glass rounded-[2rem] p-5 flex flex-col min-h-0">
         <div class="flex items-center justify-between mb-4">
           <div>
             <p class="text-xs text-brand-light font-black uppercase tracking-widest">Jugadores</p>
-            <h2 class="text-2xl font-black"><span id="waiting-count">0</span> en sala</h2>
+            <h2 class="text-2xl font-black"><span id="waiting-count">0</span> conectados</h2>
           </div>
-          <div id="realtime-badge" class="text-xs font-black px-3 py-1.5 rounded-full bg-white/10 text-emerald-100/60">API</div>
+          <div class="text-3xl">👥</div>
         </div>
-        <div id="waiting-players" class="flex flex-col gap-2 flex-1 overflow-y-auto scrollbar-none"></div>
-        <div class="pt-4 mt-4 border-t border-white/10">
-          <button id="start-button" onclick="App.startGame()" class="btn-brand w-full rounded-2xl py-4 font-black text-lg">Empezar partida 🚀</button>
-          <p id="guest-wait" class="hidden text-center text-emerald-100/55 text-sm py-4"><span class="inline-flex gap-1 mr-2"><span class="w-1.5 h-1.5 rounded-full bg-brand-light pulse-dot inline-block"></span><span class="w-1.5 h-1.5 rounded-full bg-brand-light pulse-dot inline-block" style="animation-delay:.2s"></span><span class="w-1.5 h-1.5 rounded-full bg-brand-light pulse-dot inline-block" style="animation-delay:.4s"></span></span>Esperando al anfitrión…</p>
-        </div>
-      </section>
-    </main>
-  </section>
-
-  <section id="screen-game" class="screen flex-col min-h-screen p-4 sm:p-6 gap-4 relative mobile-tight">
-    <header class="w-full max-w-6xl mx-auto glass rounded-[2rem] px-4 sm:px-5 py-4 flex items-center justify-between gap-3">
-      <div>
-        <p class="text-xs text-emerald-100/45 font-bold uppercase tracking-widest">Artículo <span id="game-round">1</span>/<span id="game-total">8</span></p>
-        <div class="mt-2 h-2 w-36 sm:w-56 bg-white/10 rounded-full overflow-hidden"><div id="timer-bar" class="h-full bg-gradient-to-r from-brand-light to-market-yellow rounded-full transition-all duration-300" style="width:100%"></div></div>
-      </div>
-      <div class="text-right">
-        <p class="text-xs text-emerald-100/45 font-bold uppercase tracking-widest">Tiempo</p>
-        <p id="timer-label" class="text-3xl font-black price-display">45</p>
-      </div>
-    </header>
-
-    <main class="w-full max-w-6xl mx-auto grid lg:grid-cols-[1fr_420px] gap-4 flex-1 min-h-0">
-      <section id="product-card" class="glass rounded-[2.4rem] p-5 sm:p-7 flex flex-col items-center justify-center text-center overflow-hidden relative">
-        <div class="absolute inset-x-8 top-10 h-32 bg-brand/20 blur-3xl rounded-full"></div>
-        <div id="product-content" class="relative product-drop w-full max-w-xl">
-          <div id="product-category" class="inline-flex bg-brand/20 border border-brand-light/20 text-brand-light rounded-full px-4 py-2 text-xs font-black uppercase tracking-widest mb-4">Categoría</div>
-          <div class="product-image-frame mx-auto w-56 h-56 sm:w-72 sm:h-72 rounded-[2rem] bg-white p-4 shadow-2xl shadow-black/30 flex items-center justify-center">
-            <img id="product-image" src="" alt="" class="max-w-full max-h-full object-contain drop-shadow-xl" />
-          </div>
-          <h2 id="product-name" class="text-2xl sm:text-4xl font-black leading-tight mt-6">Producto</h2>
-          <p id="product-path" class="text-sm text-emerald-100/45 mt-3 line-clamp-2"></p>
-        </div>
-      </section>
-
-      <aside class="glass rounded-[2rem] p-5 flex flex-col gap-4">
-        <div>
-          <p class="text-xs text-brand-light font-black uppercase tracking-widest">Tu apuesta</p>
-          <div id="answer-display" class="price-display text-6xl font-black text-gradient mt-1">0,00 €</div>
-          <p id="answer-helper" class="text-xs text-emerald-100/45 mt-1">Pulsa los números como céntimos: 245 = 2,45 €</p>
-        </div>
-
-        <div id="keypad" class="grid grid-cols-3 gap-2">
-          <button data-key="1" class="key btn-soft rounded-2xl text-2xl font-black">1</button>
-          <button data-key="2" class="key btn-soft rounded-2xl text-2xl font-black">2</button>
-          <button data-key="3" class="key btn-soft rounded-2xl text-2xl font-black">3</button>
-          <button data-key="4" class="key btn-soft rounded-2xl text-2xl font-black">4</button>
-          <button data-key="5" class="key btn-soft rounded-2xl text-2xl font-black">5</button>
-          <button data-key="6" class="key btn-soft rounded-2xl text-2xl font-black">6</button>
-          <button data-key="7" class="key btn-soft rounded-2xl text-2xl font-black">7</button>
-          <button data-key="8" class="key btn-soft rounded-2xl text-2xl font-black">8</button>
-          <button data-key="9" class="key btn-soft rounded-2xl text-2xl font-black">9</button>
-          <button data-key="clear" class="key btn-soft rounded-2xl text-sm font-black text-emerald-100/65">C</button>
-          <button data-key="0" class="key btn-soft rounded-2xl text-2xl font-black">0</button>
-          <button data-key="back" class="key btn-soft rounded-2xl text-2xl font-black">⌫</button>
-        </div>
-
-        <button id="submit-answer" onclick="App.submitAnswer()" class="btn-brand rounded-2xl py-4 font-black text-lg">Enviar precio</button>
-        <div id="answers-status" class="text-sm text-emerald-100/55 text-center min-h-6"></div>
-        <div id="mini-scores" class="grid grid-cols-2 gap-2 pt-2"></div>
+        <div id="waiting-players" class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 scrollbar-none"></div>
+        <div id="guest-wait" class="hidden panel rounded-2xl p-4 mt-4 text-sm text-emerald-100/60">Esperando a que el anfitrión empiece la partida.</div>
       </aside>
     </main>
   </section>
 
-  <section id="screen-reveal" class="screen flex-col min-h-screen p-4 sm:p-6 gap-4 relative mobile-tight">
-    <div id="confetti-container" aria-hidden="true"></div>
-    <header class="w-full max-w-5xl mx-auto glass rounded-[2rem] px-5 py-4 text-center">
-      <p class="text-xs text-brand-light font-black uppercase tracking-widest">Resultado</p>
-      <h2 id="reveal-product-name" class="text-2xl sm:text-4xl font-black mt-1">Producto</h2>
-      <p class="text-emerald-100/55 mt-2">Precio real: <span id="reveal-price" class="text-gradient text-4xl font-black price-display">0,00 €</span></p>
+  <section id="screen-game" class="screen flex-col min-h-screen p-4 sm:p-6 gap-4 relative">
+    <header class="w-full max-w-6xl mx-auto glass rounded-[2rem] px-5 py-4 flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <p id="game-mode-label" class="text-xs text-brand-light font-black uppercase tracking-widest truncate">MercaPrecios</p>
+        <p class="text-emerald-100/55 text-sm">Ronda <span id="game-round">1</span>/<span id="game-total">8</span></p>
+        <div class="mt-2 h-2 bg-white/10 rounded-full overflow-hidden w-44 max-w-full"><div id="timer-bar" class="h-full bg-brand-light rounded-full transition-all"></div></div>
+      </div>
+      <div class="text-right">
+        <p class="text-xs text-emerald-100/45 font-bold uppercase tracking-widest">Tiempo</p>
+        <p id="timer-label" class="price-display text-4xl font-black text-gradient">45</p>
+      </div>
     </header>
 
-    <main class="w-full max-w-5xl mx-auto grid lg:grid-cols-[.82fr_1.18fr] gap-4 flex-1 min-h-0">
-      <section class="glass rounded-[2rem] p-5 flex flex-col items-center justify-center text-center">
-        <div class="w-48 h-48 rounded-[2rem] bg-white p-4 flex items-center justify-center shadow-2xl shadow-black/30">
-          <img id="reveal-image" src="" alt="" class="max-w-full max-h-full object-contain" />
+    <main class="w-full max-w-6xl mx-auto grid lg:grid-cols-[1.05fr_.95fr] gap-4 flex-1 min-h-0">
+      <section id="game-content" class="glass rounded-[2rem] p-5 flex items-center justify-center overflow-hidden"></section>
+      <aside class="glass rounded-[2rem] p-5 flex flex-col gap-4">
+        <div>
+          <p id="answer-title" class="text-xs text-brand-light font-black uppercase tracking-widest">Tu precio</p>
+          <div id="answer-display" class="price-display text-5xl font-black text-gradient mt-2">0,00 €</div>
+          <p id="answer-helper" class="text-sm text-emerald-100/45 mt-1">Introduce el precio con el teclado.</p>
         </div>
-        <div id="winner-box" class="winner-card w-full mt-5 rounded-[2rem] bg-gradient-to-br from-brand/35 to-market-yellow/20 border border-brand-light/30 p-5"></div>
-      </section>
+        <div id="input-area"></div>
+        <p id="answers-status" class="text-xs text-emerald-100/45 min-h-[18px]"></p>
+        <div id="mini-scores" class="hidden sm:flex flex-col gap-2 max-h-44 overflow-y-auto scrollbar-none"></div>
+      </aside>
+    </main>
+  </section>
 
-      <section class="glass rounded-[2rem] p-5 flex flex-col min-h-[420px]">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <p class="text-xs text-brand-light font-black uppercase tracking-widest">Apuestas</p>
-            <h3 class="text-2xl font-black">Clasificación de la ronda</h3>
-          </div>
-          <div id="round-rule" class="text-xs font-black px-3 py-1.5 rounded-full bg-white/10 text-emerald-100/70">Precio justo</div>
+  <section id="screen-reveal" class="screen flex-col min-h-screen p-4 sm:p-6 gap-4 relative">
+    <div id="confetti-container"></div>
+    <header class="w-full max-w-6xl mx-auto glass show-stage rounded-[2rem] px-5 py-4 text-center">
+      <p class="text-xs text-market-yellow font-black uppercase tracking-[.32em]">El precio real era</p>
+      <h2 id="reveal-title" class="text-2xl sm:text-4xl font-black mt-1">—</h2>
+      <div id="reveal-price" class="price-display text-5xl sm:text-7xl font-black text-gradient mt-2">—</div>
+      <p id="round-rule" class="text-sm text-emerald-100/50 mt-2">—</p>
+    </header>
+
+    <main class="w-full max-w-6xl mx-auto grid lg:grid-cols-[.9fr_1.1fr] gap-4 flex-1 min-h-0">
+      <section class="glass rounded-[2rem] p-5 flex flex-col items-center justify-center text-center overflow-hidden">
+        <div id="reveal-visual" class="w-full"></div>
+        <div id="winner-box" class="winner-card w-full mt-4 rounded-[2rem] p-5 bg-brand/20 border border-brand-light/40"></div>
+      </section>
+      <section class="glass rounded-[2rem] p-5 flex flex-col min-h-0">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-2xl font-black">Resultados</h3>
+          <span id="reveal-medal-summary" class="medal-badge rounded-full px-3 py-1 text-xs font-black uppercase tracking-wider">Show</span>
         </div>
-        <div id="reveal-results" class="flex flex-col gap-2 flex-1 overflow-y-auto scrollbar-none"></div>
-        <div id="reveal-action-bar" class="pt-4 mt-4 border-t border-white/10">
-          <button id="next-round-button" onclick="App.nextRound()" class="btn-brand w-full rounded-2xl py-4 font-black text-lg">Siguiente artículo →</button>
-          <p id="guest-next-wait" class="hidden text-center text-emerald-100/55 text-sm py-4">Esperando al anfitrión…</p>
+        <div id="reveal-results" class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 scrollbar-none"></div>
+        <div id="reveal-action-bar" class="mt-4">
+          <button id="next-round-button" onclick="App.nextRound()" class="btn-brand w-full rounded-2xl py-4 text-lg font-black uppercase tracking-widest">Siguiente ronda</button>
+          <div id="guest-next-wait" class="hidden panel rounded-2xl p-4 text-center text-sm text-emerald-100/60">Esperando al anfitrión…</div>
         </div>
       </section>
     </main>
   </section>
 
-  <section id="screen-final" class="screen flex-col items-center justify-center min-h-screen p-6 gap-5 relative text-center">
-    <div id="final-confetti" aria-hidden="true"></div>
-    <div class="pop">
-      <p class="text-xs text-brand-light font-black uppercase tracking-[.35em]">Fin de la partida</p>
-      <div class="text-8xl my-4">🏆</div>
-      <p class="text-emerald-100/45 font-bold uppercase tracking-widest text-xs">Ganador</p>
-      <h2 id="final-winner" class="text-5xl font-black text-gradient mt-1">—</h2>
+  <section id="screen-final" class="screen flex-col items-center justify-center min-h-screen p-5 gap-5 relative">
+    <div id="final-confetti"></div>
+    <div class="w-full max-w-2xl glass rounded-[2.4rem] p-6 sm:p-8 text-center show-stage">
+      <p class="text-xs text-market-yellow font-black uppercase tracking-[.34em]">Partida terminada</p>
+      <h2 class="text-5xl sm:text-7xl font-black text-gradient mt-2">¡Tenemos ganador!</h2>
+      <div class="text-6xl my-4">🏆</div>
+      <p id="final-winner" class="text-3xl font-black">—</p>
+      <p id="final-summary" class="text-emerald-100/55 mt-2">—</p>
+      <div id="final-scores" class="mt-6 flex flex-col gap-3"></div>
+      <div class="grid sm:grid-cols-2 gap-3 mt-6">
+        <button onclick="App.shareFinalResult()" class="btn-brand rounded-2xl py-4 font-black uppercase tracking-widest">Compartir por WhatsApp</button>
+        <button id="new-game-button" onclick="App.newGame()" class="btn-soft rounded-2xl py-4 font-black uppercase tracking-widest">Nueva partida</button>
+      </div>
+      <button onclick="App.exitToHome()" class="mt-3 text-xs text-emerald-100/45 hover:text-emerald-100/70 underline underline-offset-4">Volver al inicio</button>
+      <div id="guest-final-wait" class="hidden panel rounded-2xl p-4 mt-4 text-sm text-emerald-100/60">Esperando nueva partida del anfitrión…</div>
     </div>
-    <div class="w-full max-w-md glass rounded-[2rem] p-5 pop" style="animation-delay:.08s">
-      <div id="final-scores" class="flex flex-col gap-2"></div>
-      <button id="new-game-button" onclick="App.newGame()" class="btn-brand mt-5 w-full rounded-2xl py-4 font-black text-lg">Nueva partida</button>
-      <p id="guest-final-wait" class="hidden mt-4 text-sm text-emerald-100/55">Esperando nueva sala…</p>
-    </div>
-    <button onclick="App.exitToHome()" class="text-xs text-emerald-100/45 hover:text-emerald-100/75 underline underline-offset-4">Salir al menú</button>
   </section>
 
-  <div id="share-modal" class="hidden fixed inset-0 z-[90] px-4 py-6 items-center justify-center">
-    <button class="absolute inset-0 bg-black/75 backdrop-blur-sm" onclick="App.closeShareModal()" aria-label="Cerrar"></button>
-    <div class="relative w-full max-w-sm glass rounded-[2rem] p-5 pop">
-      <div class="flex items-start justify-between gap-3 mb-4">
-        <div>
-          <p class="text-xs text-brand-light font-black uppercase tracking-widest">Compartir sala</p>
-          <h2 class="text-3xl font-black">Código <span id="share-code" class="text-gradient">—</span></h2>
-        </div>
-        <button onclick="App.closeShareModal()" class="btn-soft rounded-2xl w-11 h-11 text-2xl">×</button>
+  <div id="share-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-5 bg-black/70 backdrop-blur-sm">
+    <div class="glass rounded-[2rem] p-5 w-full max-w-sm text-center pop">
+      <p class="text-xs text-brand-light font-black uppercase tracking-widest">Compartir sala</p>
+      <div id="share-code" class="text-5xl font-black text-gradient tracking-[.18em] mt-2">—</div>
+      <div id="qr-container" class="my-4 flex justify-center"></div>
+      <input id="share-link" readonly class="w-full bg-black/25 border border-white/10 rounded-xl px-3 py-3 text-xs text-center text-emerald-100/70" />
+      <div class="grid grid-cols-2 gap-3 mt-4">
+        <button onclick="App.copyShareLink()" class="btn-brand rounded-2xl py-3 font-black">Copiar</button>
+        <button onclick="App.nativeShare()" class="btn-soft rounded-2xl py-3 font-black">Enviar</button>
       </div>
-      <div id="qr-container" class="mx-auto bg-white p-3 rounded-[1.5rem] w-fit min-h-[220px] flex items-center justify-center"></div>
-      <p class="text-xs text-emerald-100/45 text-center mt-3">Escanea o copia el enlace.</p>
-      <input id="share-link" readonly class="mt-4 w-full bg-black/25 border border-white/10 rounded-2xl px-3 py-3 text-xs text-emerald-100/70 outline-none" />
-      <div class="grid grid-cols-2 gap-2 mt-3">
-        <button onclick="App.copyShareLink()" class="btn-soft rounded-2xl py-3 font-black">Copiar</button>
-        <button onclick="App.nativeShare()" class="btn-brand rounded-2xl py-3 font-black">Compartir</button>
-      </div>
+      <button onclick="App.closeShareModal()" class="mt-3 text-xs text-emerald-100/45 hover:text-emerald-100/70 underline underline-offset-4">Cerrar</button>
     </div>
   </div>
 
-  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 glass px-5 py-3 rounded-2xl text-sm font-bold opacity-0 transition-opacity pointer-events-none z-[120] max-w-[calc(100vw-2rem)] text-center"></div>
+  <div id="toast" class="fixed left-1/2 bottom-5 z-[120] -translate-x-1/2 opacity-0 pointer-events-none rounded-full bg-white text-[#03120B] px-5 py-3 text-sm font-black shadow-2xl transition"></div>
 
   <script src="js/GameAPI.js"></script>
-  <script type="module" src="js/mercaprecios.js"></script>
+  <script src="js/mercaprecios.js"></script>
 </body>
 </html>
