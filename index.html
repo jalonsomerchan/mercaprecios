@@ -2,7 +2,7 @@
 <html lang="es" class="h-full">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>MercaPrecios</title>
   <meta name="description" content="Juego multijugador para adivinar el precio de productos de Mercadona." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,7 +23,11 @@
     }
   </script>
   <style>
-    * { -webkit-tap-highlight-color: transparent; }
+    * { -webkit-tap-highlight-color: transparent; box-sizing:border-box; }
+    html { min-height:100%; overflow-x:hidden; text-size-adjust:100%; -webkit-text-size-adjust:100%; }
+    body { min-height:100%; overscroll-behavior:none; touch-action:manipulation; }
+    button, input { font:inherit; touch-action:manipulation; }
+    button { user-select:none; -webkit-user-select:none; }
     .screen { display: none; }
     .screen.active { display: flex; animation: screenIn .32s cubic-bezier(.34,1.4,.64,1) both; }
     @keyframes screenIn { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
@@ -43,9 +47,9 @@
     .btn-soft:active { transform:scale(.98); }
     .text-gradient { background:linear-gradient(135deg,#F8FFE9,#42E28A 42%,#FFE36E); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
     .mercadona-title { text-shadow:0 0 34px rgba(66,226,138,.24); }
-    .toggle { position:relative; display:inline-block; width:52px; height:30px; flex-shrink:0; }
-    .toggle input { opacity:0; width:0; height:0; }
-    .toggle-track { position:absolute; inset:0; border-radius:999px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.08); transition:.2s; cursor:pointer; }
+    .toggle { position:relative; display:inline-block; width:52px; height:30px; flex-shrink:0; cursor:pointer; touch-action:manipulation; }
+    .toggle input { position:absolute; inset:0; z-index:2; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; appearance:none; -webkit-appearance:none; }
+    .toggle-track { position:absolute; inset:0; border-radius:999px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.08); transition:.2s; pointer-events:none; }
     .toggle-track::after { content:''; position:absolute; width:22px; height:22px; left:3px; top:3px; border-radius:50%; background:white; transition:.2s; box-shadow:0 3px 10px rgba(0,0,0,.35); }
     .toggle input:checked + .toggle-track { background:#00A651; box-shadow:0 0 24px rgba(0,166,81,.38); }
     .toggle input:checked + .toggle-track::after { transform:translateX(22px); }
@@ -67,15 +71,26 @@
     .category-pill .category-check { opacity:.28; transform:scale(.9); transition:.18s; }
     .category-pill:has(input:checked) { background:rgba(0,166,81,.25)!important; border-color:rgba(66,226,138,.72); color:#dcfce7; box-shadow:0 10px 32px rgba(0,166,81,.13); }
     .category-pill:has(input:checked) .category-check { opacity:1; transform:scale(1); background:#42E28A; color:#03120B; }
-    .key { min-height:58px; }
+    .key {
+      min-height:58px;
+      transform:translateZ(0);
+      will-change:transform;
+    }
+    .key.key-active {
+      background:rgba(66,226,138,.28)!important;
+      border-color:rgba(66,226,138,.58)!important;
+      transform:translateY(1px) scale(.96);
+      box-shadow:0 0 0 2px rgba(66,226,138,.18) inset;
+    }
     .price-display { font-variant-numeric: tabular-nums; }
     .scrollbar-none { scrollbar-width:none; }
     .scrollbar-none::-webkit-scrollbar { display:none; }
     @media (max-width: 640px) {
-      html, body { height:100%; }
+      html, body { min-height:100%; width:100%; overflow-x:hidden; }
+      input, select, textarea { font-size:16px!important; }
       #screen-game.active {
-        height:100dvh;
-        min-height:100dvh;
+        height:100svh;
+        min-height:100svh;
         overflow:hidden;
         padding:calc(7px + env(safe-area-inset-top)) 8px calc(7px + env(safe-area-inset-bottom));
         gap:6px;
@@ -131,8 +146,8 @@
       }
       #product-card .product-image-frame {
         order:1;
-        width:clamp(160px,35dvh,245px)!important;
-        height:clamp(160px,35dvh,245px)!important;
+        width:clamp(160px,35svh,245px)!important;
+        height:clamp(160px,35svh,245px)!important;
         border-radius:24px!important;
         padding:10px!important;
         box-shadow:0 14px 40px rgba(0,0,0,.34)!important;
@@ -196,8 +211,8 @@
       }
       #mini-scores { display:none!important; }
       #screen-reveal.active {
-        height:100dvh;
-        min-height:100dvh;
+        height:100svh;
+        min-height:100svh;
         overflow:hidden;
         padding:calc(8px + env(safe-area-inset-top)) 8px calc(76px + env(safe-area-inset-bottom));
         gap:8px;
@@ -291,7 +306,7 @@
       #screen-game > main { gap:5px; }
       #product-card { padding:6px 8px!important; border-radius:17px!important; }
       #product-card .product-drop { gap:4px; }
-      #product-card .product-image-frame { width:clamp(128px,30dvh,174px)!important; height:clamp(128px,30dvh,174px)!important; padding:7px!important; border-radius:19px!important; }
+      #product-card .product-image-frame { width:clamp(128px,30svh,174px)!important; height:clamp(128px,30svh,174px)!important; padding:7px!important; border-radius:19px!important; }
       #product-category { font-size:8px!important; padding:3px 7px!important; margin-top:1px!important; }
       #product-name { font-size:clamp(14px,4vw,18px)!important; -webkit-line-clamp:2; }
       #screen-game aside { padding:7px!important; gap:5px!important; }
@@ -404,7 +419,7 @@
             <p class="text-sm font-bold">Modo Precio Justo</p>
             <p class="text-xs text-emerald-100/45 mt-1">Gana quien más se acerque sin pasarse. Si nadie queda por debajo, gana el más cercano.</p>
           </div>
-          <span class="toggle"><input id="cfg-justo" type="checkbox" checked /><span class="toggle-track"></span></span>
+          <label class="toggle" aria-label="Activar modo Precio Justo"><input id="cfg-justo" type="checkbox" checked /><span class="toggle-track"></span></label>
         </div>
 
         <div class="panel rounded-2xl p-4">
@@ -467,7 +482,7 @@
     <main class="w-full max-w-6xl mx-auto grid lg:grid-cols-[1fr_420px] gap-4 flex-1 min-h-0">
       <section id="product-card" class="glass rounded-[2.4rem] p-5 sm:p-7 flex flex-col items-center justify-center text-center overflow-hidden relative">
         <div class="absolute inset-x-8 top-10 h-32 bg-brand/20 blur-3xl rounded-full"></div>
-        <div class="relative product-drop w-full max-w-xl">
+        <div id="product-content" class="relative product-drop w-full max-w-xl">
           <div id="product-category" class="inline-flex bg-brand/20 border border-brand-light/20 text-brand-light rounded-full px-4 py-2 text-xs font-black uppercase tracking-widest mb-4">Categoría</div>
           <div class="product-image-frame mx-auto w-56 h-56 sm:w-72 sm:h-72 rounded-[2rem] bg-white p-4 shadow-2xl shadow-black/30 flex items-center justify-center">
             <img id="product-image" src="" alt="" class="max-w-full max-h-full object-contain drop-shadow-xl" />

@@ -45,6 +45,8 @@ const state = {
   pendingMessages: [],
   lastEventId: '',
   latestEvent: null,
+  lastRenderedScreen: '',
+  lastRenderedRoundKey: '',
 };
 
 const $ = id => document.getElementById(id);
@@ -56,8 +58,27 @@ const escapeHTML = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '
 const initials = name => escapeHTML(String(name || '?').trim()[0]?.toUpperCase() || '?');
 
 function showScreen(name) {
+  state.lastRenderedScreen = name;
   document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
   $(`screen-${name}`)?.classList.add('active');
+}
+
+function mergeAnswers(localAnswers = {}, incomingAnswers = {}) {
+  const merged = { ...(localAnswers || {}) };
+  Object.entries(incomingAnswers || {}).forEach(([playerId, answer]) => {
+    const id = String(playerId);
+    const current = merged[id];
+    const incomingAt = Number(answer?.at || 0);
+    const currentAt = Number(current?.at || 0);
+    if (!current || incomingAt >= currentAt) merged[id] = answer;
+  });
+  return merged;
+}
+
+function samePlayingRound(gameState = {}) {
+  return state.status === 'playing'
+    && gameState.status === 'playing'
+    && Number(gameState.currentRound ?? state.currentRound) === Number(state.currentRound);
 }
 
 function toast(message, icon = '') {
@@ -215,6 +236,7 @@ function serializeGame(extra = {}) {
 
 function applyGameState(gameState = {}) {
   if (!gameState || typeof gameState !== 'object') return;
+  const shouldMergeAnswers = samePlayingRound(gameState);
   state.status = gameState.status ?? state.status;
   state.hostId = String(gameState.hostId ?? state.hostId ?? '');
   state.isHost = state.hostId ? sid() === state.hostId : state.isHost;
@@ -222,7 +244,9 @@ function applyGameState(gameState = {}) {
   state.settings = normalizeSettings(gameState.settings ?? state.settings);
   state.gameProducts = normalizeProducts(gameState.gameProducts ?? state.gameProducts);
   state.currentRound = Number(gameState.currentRound ?? state.currentRound ?? 0);
-  state.answers = gameState.answers ?? state.answers ?? {};
+  state.answers = shouldMergeAnswers
+    ? mergeAnswers(state.answers, gameState.answers)
+    : (gameState.answers ?? state.answers ?? {});
   state.scores = gameState.scores ?? state.scores ?? {};
   state.reveal = gameState.reveal ?? state.reveal ?? null;
   state.roundEndsAt = Number(gameState.roundEndsAt ?? state.roundEndsAt ?? 0);
@@ -373,28 +397,38 @@ function currentProduct() {
 }
 
 function renderGame() {
-  showScreen('game');
+  const roundKey = `${state.room?.code || ''}:${state.currentRound}:${currentProduct()?.id || ''}:${state.roundEndsAt || 0}`;
+  const isNewRoundRender = state.lastRenderedScreen !== 'game' || state.lastRenderedRoundKey !== roundKey;
+  if (isNewRoundRender) {
+    showScreen('game');
+    state.lastRenderedRoundKey = roundKey;
+  }
   const product = currentProduct();
   if (!product) return;
   $('game-round') && ($('game-round').textContent = String(state.currentRound + 1));
   $('game-total') && ($('game-total').textContent = String(state.gameProducts.length || state.settings.articles));
-  $('product-category') && ($('product-category').textContent = product.category || 'Mercadona');
-  $('product-name') && ($('product-name').textContent = product.name);
-  $('product-path') && ($('product-path').textContent = product.categoryPath || '');
-  const img = $('product-image');
-  if (img) {
-    img.src = product.thumbnail || '';
-    img.alt = product.name;
+  if (isNewRoundRender) {
+    $('product-category') && ($('product-category').textContent = product.category || 'Mercadona');
+    $('product-name') && ($('product-name').textContent = product.name);
+    $('product-path') && ($('product-path').textContent = product.categoryPath || '');
+    const img = $('product-image');
+    if (img) {
+      img.src = product.thumbnail || '';
+      img.alt = product.name;
+    }
+    const productContent = $('product-content');
+    productContent?.classList.remove('product-drop');
+    void productContent?.offsetWidth;
+    productContent?.classList.add('product-drop');
   }
-  const card = $('product-card');
-  card?.classList.remove('product-drop');
-  void card?.offsetWidth;
-  card?.classList.add('product-drop');
-  state.inputDigits = state.answers[sid()] ? centsToDigits(Number(state.answers[sid()].value)) : '';
+  if (state.answers[sid()]) {
+    const submittedDigits = centsToDigits(Number(state.answers[sid()].value));
+    if (state.inputDigits !== submittedDigits) state.inputDigits = submittedDigits;
+  }
   renderAnswerDisplay();
   updateAnswerStatus();
   renderMiniScores();
-  startTimer();
+  if (isNewRoundRender) startTimer();
 }
 
 function centsToDigits(value) {
@@ -404,6 +438,14 @@ function centsToDigits(value) {
 
 function inputValue() {
   return byPrice(Number(state.inputDigits || '0') / 100);
+}
+
+function flashKey(key) {
+  const button = document.querySelector(`#keypad [data-key="${CSS.escape(String(key))}"]`);
+  if (!button) return;
+  button.classList.add('key-active');
+  clearTimeout(button._activeTimer);
+  button._activeTimer = setTimeout(() => button.classList.remove('key-active'), 140);
 }
 
 function renderAnswerDisplay() {
@@ -700,8 +742,9 @@ function flushPendingMessages() {
   queued.forEach(event => emit(event.type, event));
 }
 
-function persistGameState(latestEvent = null) {
+async function persistGameState(latestEvent = null, { mergeRemote = false } = {}) {
   if (!state.room?.code) return Promise.resolve();
+  if (mergeRemote && state.status === 'playing') await mergeLatestRoomState();
   if (latestEvent) state.latestEvent = latestEvent;
   const gameState = serializeGame({ latestEvent: state.latestEvent, status: state.status });
   return api.updateRoomState(state.room.code, { gameState, status: state.status, roomSettings: state.settings }).catch(error => {
@@ -716,7 +759,7 @@ function emit(type, data = {}) {
   const payload = { ...event, gameState: serializeGame({ latestEvent: event }) };
   if (state.socketReady && state.socket?.send && !state.pollingTimer) state.socket.send(JSON.stringify(payload));
   else if (!state.pollingTimer) state.pendingMessages.push(payload);
-  persistGameState(event);
+  persistGameState(event, { mergeRemote: type === 'answer_submitted' });
 }
 
 function handleEvent(event, { fromPoll = false } = {}) {
@@ -853,6 +896,9 @@ window.App = {
     }
 
     document.querySelectorAll('#keypad [data-key]').forEach(button => {
+      button.type = 'button';
+      button.setAttribute('aria-label', button.dataset.key === 'clear' ? 'Borrar precio' : button.dataset.key === 'back' ? 'Borrar último número' : `Número ${button.dataset.key}`);
+      button.addEventListener('pointerdown', () => flashKey(button.dataset.key));
       button.addEventListener('click', () => App.pressKey(button.dataset.key));
     });
 
@@ -1025,6 +1071,7 @@ window.App = {
 
   pressKey(key) {
     if (state.answers[sid()] || state.status !== 'playing') return;
+    flashKey(key);
     if (/^\d$/.test(key)) {
       state.inputDigits = (state.inputDigits + key).replace(/^0+(?=\d)/, '').slice(0, 5);
     } else if (key === 'back') {
@@ -1043,9 +1090,10 @@ window.App = {
       return;
     }
     await mergeLatestRoomState();
+    if (state.status !== 'playing' || state.answers[sid()]) return;
     const answer = { value, username: state.user.username, at: Date.now() };
     state.answers = { ...state.answers, [sid()]: answer };
-    await persistGameState();
+    await persistGameState(null, { mergeRemote: true });
     emit('answer_submitted', { playerId: sid(), answer, player: currentPlayer() });
     renderAnswerDisplay();
     updateAnswerStatus();
