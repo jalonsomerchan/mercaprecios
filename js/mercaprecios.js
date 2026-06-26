@@ -90,6 +90,9 @@ const state = {
   timerInterval: null,
   pollingTimer: null,
   roundEndsAt: 0,
+  revealAnimationKey: '',
+  revealAnimationDone: false,
+  revealTimers: [],
   lastRenderedRoundKey: '',
   lastRenderedScreen: '',
 };
@@ -740,13 +743,13 @@ function renderRoundContent(round) {
       <p class="text-sm text-emerald-100/45 mt-2">${escapeHTML(product.categoryPath || '')}</p>
     </div>`;
   } else if (round.mode === 'basket') {
-    root.innerHTML = `<div id="product-area" class="product-drop w-full text-center">
+    root.innerHTML = `<div id="product-area" class="product-drop basket-round w-full text-center scrollbar-none">
       <p class="inline-flex rounded-full bg-market-yellow/15 border border-market-yellow/30 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-market-yellow">Cesta completa</p>
       <h2 class="text-2xl sm:text-4xl font-black mt-3">${escapeHTML(round.title)}</h2>
-      <p class="text-sm text-emerald-100/45 mt-1">${escapeHTML(round.subtitle)}</p>
-      <div class="grid grid-cols-${Math.min(round.products.length, 5)} gap-2 sm:gap-3 mt-5">
-        ${round.products.map(product => `<div class="panel rounded-2xl p-2 sm:p-3 min-w-0">
-          ${productImage(product, 'aspect-square rounded-2xl')}
+      <p class="basket-subtitle text-sm text-emerald-100/45 mt-1">${escapeHTML(round.subtitle)}</p>
+      <div class="basket-grid mt-4 sm:mt-5" data-count="${round.products.length}">
+        ${round.products.map(product => `<div class="basket-card panel rounded-2xl p-2 sm:p-3 min-w-0">
+          ${productImage(product, 'basket-image rounded-2xl')}
           <p class="text-xs sm:text-sm font-black mt-2 leading-tight line-clamp-2">${escapeHTML(product.name)}</p>
         </div>`).join('')}
       </div>
@@ -951,16 +954,20 @@ function calculateReveal() {
     const medal = getMedal(row, round);
     if (medal) medalMap[id] = [...(medalMap[id] || []), medal.key];
 
-    if (winnerIds.includes(id)) nextScores[id] += 3;
+    let roundPoints = 0;
+    if (winnerIds.includes(id)) roundPoints += 3;
     if (mode.input === 'number') {
-      if (!row.missing && row.diff === 0) nextScores[id] += 2;
-      if (!row.missing && row.diff <= 0.1) nextScores[id] += 1;
+      if (!row.missing && row.diff === 0) roundPoints += 2;
+      if (!row.missing && row.diff <= 0.1) roundPoints += 1;
     } else if (mode.input === 'choice') {
-      if (row.correct) nextScores[id] += 2;
+      if (row.correct) roundPoints += 2;
     } else if (mode.input === 'order') {
-      if (row.correct) nextScores[id] += 2;
-      else if (!row.missing && row.distance <= 2) nextScores[id] += 1;
+      if (row.correct) roundPoints += 2;
+      else if (!row.missing && row.distance <= 2) roundPoints += 1;
     }
+    row.roundPoints = roundPoints;
+    row.totalScore = nextScores[id] + roundPoints;
+    nextScores[id] += roundPoints;
   });
 
   rows.sort((a, b) => {
@@ -1024,9 +1031,9 @@ function renderRevealVisual(reveal) {
   const round = reveal.round;
   const mode = roundMode(round);
   if (round.mode === 'basket') {
-    root.innerHTML = `<div class="grid grid-cols-${Math.min(round.products.length, 5)} gap-2">
-      ${round.products.map(product => `<div class="panel rounded-2xl p-2">
-        ${productImage(product, 'aspect-square rounded-xl')}
+    root.innerHTML = `<div class="basket-grid" data-count="${round.products.length}">
+      ${round.products.map(product => `<div class="basket-card panel rounded-2xl p-2">
+        ${productImage(product, 'basket-image rounded-xl')}
         <p class="text-xs font-black mt-2 line-clamp-2">${escapeHTML(product.name)}</p>
         <p class="text-brand-light font-black">${euros(product.price)}</p>
       </div>`).join('')}
@@ -1055,6 +1062,126 @@ function renderRevealVisual(reveal) {
   }
 }
 
+function clearRevealAnimationTimers() {
+  (state.revealTimers || []).forEach(timer => clearTimeout(timer));
+  state.revealTimers = [];
+}
+
+function scheduleRevealStep(callback, delay) {
+  const timer = setTimeout(callback, delay);
+  state.revealTimers.push(timer);
+  return timer;
+}
+
+function revealAnimationKey(reveal) {
+  const round = reveal?.round || {};
+  return `${state.room?.code || 'solo'}:${state.currentRound}:${round.id || ''}:${reveal?.winnerIds?.join(',') || ''}:${reveal?.rows?.map(row => `${row.player.id}-${row.roundPoints}-${row.distance}`).join('|') || ''}`;
+}
+
+function revealKickerText(round, mode) {
+  if (round.mode === 'basket') return 'El precio total es…';
+  if (mode.input === 'number') return 'El precio real es…';
+  return 'La respuesta correcta es…';
+}
+
+function revealFinalValue(round, mode) {
+  if (mode.input === 'number') return euros(round.targetPrice);
+  if (round.mode === 'versus') {
+    const product = round.products.find(item => item.id === round.correctProductId);
+    return product ? product.name : 'Producto correcto';
+  }
+  if (round.mode === 'order') return 'Orden correcto';
+  return '¡Desvelado!';
+}
+
+function ownRevealPlacement(reveal) {
+  const index = reveal.rows.findIndex(row => String(row.player.id) === sid());
+  if (index < 0) return null;
+  return { position: index + 1, row: reveal.rows[index] };
+}
+
+function placementLabel(position) {
+  if (!position) return '—';
+  if (position === 1) return '1º';
+  if (position === 2) return '2º';
+  if (position === 3) return '3º';
+  return `${position}º`;
+}
+
+function renderRevealResultsList(reveal) {
+  const results = $('reveal-results');
+  if (!results) return;
+  const round = reveal.round;
+  const mode = roundMode(round);
+  results.innerHTML = reveal.rows.map((row, index) => {
+    const isWinner = reveal.winnerIds?.includes(row.player.id);
+    const medal = getMedal(row, round);
+    const totalScore = Number(reveal.scores?.[row.player.id] ?? row.totalScore ?? 0);
+    const roundPoints = Number(row.roundPoints || 0);
+    let detail = '';
+    if (mode.input === 'number') {
+      const value = row.value === null ? 'Sin respuesta' : euros(row.value);
+      const diffText = row.value === null ? '—' : `${row.over ? '+' : '−'}${euros(row.diff).replace('-', '')}`;
+      detail = `<p class="text-xs text-emerald-100/45">Apuesta: <span class="font-bold text-emerald-100/80">${value}</span></p><p class="font-black ${isWinner ? 'text-market-yellow' : 'text-emerald-100/80'}">Diferencia: ${diffText}</p>`;
+    } else if (mode.input === 'choice') {
+      detail = `<p class="text-xs text-emerald-100/45">Eligió: <span class="font-bold text-emerald-100/80">${escapeHTML(answerLabel(row.answer, round))}</span></p><p class="font-black ${row.correct ? 'text-market-yellow' : 'text-market-red'}">${row.correct ? 'Correcto' : 'Falló'}</p>`;
+    } else {
+      detail = `<p class="text-xs text-emerald-100/45 line-clamp-2">${escapeHTML(answerLabel(row.answer, round))}</p><p class="font-black ${row.correct ? 'text-market-yellow' : 'text-emerald-100/80'}">Distancia: ${Number.isFinite(row.distance) ? row.distance : '—'}</p>`;
+    }
+    return `<div class="${isWinner ? 'winner-card bg-brand/20 border-brand-light/40' : 'panel'} result-row-reveal rounded-2xl p-3 flex items-center gap-3 border ${isWinner ? '' : 'border-white/10'}" style="animation-delay:${index * 95}ms">
+      <span class="w-8 text-center font-black text-emerald-100/45">#${index + 1}</span>
+      ${playerAvatar(row.player)}
+      <div class="min-w-0 flex-1">
+        <p class="font-black truncate">${escapeHTML(row.player.username)} ${String(row.player.id) === sid() ? '<span class="text-xs text-brand-light">Tú</span>' : ''}</p>
+        ${detail}
+      </div>
+      <div class="text-right min-w-[118px]">
+        <p class="text-2xl">${medal?.icon || '✨'}</p>
+        <p class="text-[11px] font-black uppercase leading-tight ${medal?.tone || 'text-emerald-100/60'}">${escapeHTML(medal?.label || '')}</p>
+        <p class="points-chip rounded-full px-2 py-1 mt-2 text-[11px] font-black text-market-yellow">+${roundPoints} pts · ${totalScore}</p>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderRevealImmediate(reveal) {
+  const round = reveal.round;
+  const mode = roundMode(round);
+  const winners = state.players.filter(player => reveal.winnerIds?.includes(player.id));
+  const placement = ownRevealPlacement(reveal);
+  $('reveal-kicker') && ($('reveal-kicker').textContent = round.mode === 'basket' ? 'El precio total es' : mode.input === 'number' ? 'El precio real es' : 'Respuesta correcta');
+  $('reveal-title') && ($('reveal-title').textContent = mode.input === 'number' ? round.title : mode.title);
+  $('reveal-price') && ($('reveal-price').textContent = revealFinalValue(round, mode));
+  $('reveal-price')?.classList.remove('reveal-suspense');
+  $('reveal-price')?.classList.add('reveal-mega');
+  $('round-rule') && ($('round-rule').textContent = placement ? `Has quedado en el puesto ${placementLabel(placement.position)}` : (mode.numeric ? (state.settings.justo ? 'Precio justo' : 'Más cercano') : round.subtitle));
+  $('reveal-medal-summary') && ($('reveal-medal-summary').textContent = 'Resultados y puntos');
+  renderRevealVisual(reveal);
+
+  const winnerBox = $('winner-box');
+  if (winnerBox) {
+    const ownMedal = placement ? getMedal(placement.row, round) : null;
+    winnerBox.classList.remove('hidden');
+    winnerBox.innerHTML = placement ? `
+      <p class="text-xs text-brand-light font-black uppercase tracking-widest">Tu puesto</p>
+      <div class="text-6xl my-2">${placement.position === 1 ? '👑' : ownMedal?.icon || '🏁'}</div>
+      <p class="text-4xl font-black text-gradient">${placementLabel(placement.position)}</p>
+      <p class="text-sm text-emerald-100/65 mt-2">${placement.position === 1 ? '¡Has ganado esta ronda!' : `Ganan ${winners.map(player => escapeHTML(player.username)).join(' + ') || '—'}`}</p>
+      <p class="text-xs text-emerald-100/45 mt-1">${ownMedal?.label || ''}${reveal.nadieSinPasarse ? ' · todos se pasaron' : ''}</p>
+    ` : `
+      <p class="text-xs text-brand-light font-black uppercase tracking-widest">Ganador${winners.length > 1 ? 'es' : ''}</p>
+      <div class="text-5xl my-2">${winners.length > 1 ? '🤝' : '👑'}</div>
+      <p class="text-3xl font-black text-gradient">${winners.map(player => escapeHTML(player.username)).join(' + ') || 'Sin ganador'}</p>
+      <p class="text-xs text-emerald-100/55 mt-2">+3 puntos${reveal.nadieSinPasarse ? ' · todos se pasaron' : ''}</p>
+    `;
+  }
+  renderRevealResultsList(reveal);
+  $('reveal-results')?.classList.remove('hidden');
+  $('reveal-action-bar')?.classList.remove('hidden');
+  $('next-round-button')?.classList.toggle('hidden', !state.isHost);
+  $('guest-next-wait')?.classList.toggle('hidden', state.isHost);
+}
+
 function renderReveal() {
   clearInterval(state.timerInterval);
   showScreen('reveal');
@@ -1062,55 +1189,87 @@ function renderReveal() {
   if (!reveal?.round) return;
   const round = reveal.round;
   const mode = roundMode(round);
-  const winners = state.players.filter(player => reveal.winnerIds?.includes(player.id));
+  const key = revealAnimationKey(reveal);
 
+  if (state.revealAnimationKey === key && state.revealAnimationDone) {
+    renderRevealImmediate(reveal);
+    return;
+  }
+  if (state.revealAnimationKey === key && !state.revealAnimationDone) {
+    return;
+  }
+
+  clearRevealAnimationTimers();
+  state.revealAnimationKey = key;
+  state.revealAnimationDone = false;
+
+  $('reveal-kicker') && ($('reveal-kicker').textContent = revealKickerText(round, mode));
   $('reveal-title') && ($('reveal-title').textContent = mode.input === 'number' ? round.title : mode.title);
-  $('reveal-price') && ($('reveal-price').textContent = mode.input === 'number' ? euros(round.targetPrice) : '¡Desvelado!');
-  $('round-rule') && ($('round-rule').textContent = mode.numeric ? (state.settings.justo ? 'Precio justo' : 'Más cercano') : round.subtitle);
-  $('reveal-medal-summary') && ($('reveal-medal-summary').textContent = mode.short);
+  $('reveal-price') && ($('reveal-price').textContent = '...');
+  $('reveal-price')?.classList.remove('reveal-mega');
+  $('reveal-price')?.classList.add('reveal-suspense');
+  $('round-rule') && ($('round-rule').textContent = 'Preparando el sobre…');
+  $('reveal-medal-summary') && ($('reveal-medal-summary').textContent = 'Show');
   renderRevealVisual(reveal);
 
   const winnerBox = $('winner-box');
   if (winnerBox) {
-    winnerBox.innerHTML = `
-      <p class="text-xs text-brand-light font-black uppercase tracking-widest">Ganador${winners.length > 1 ? 'es' : ''}</p>
-      <div class="text-5xl my-2">${winners.length > 1 ? '🤝' : '👑'}</div>
-      <p class="text-3xl font-black text-gradient">${winners.map(player => escapeHTML(player.username)).join(' + ') || 'Sin ganador'}</p>
-      <p class="text-xs text-emerald-100/55 mt-2">+3 puntos${reveal.nadieSinPasarse ? ' · todos se pasaron' : ''}</p>
-    `;
+    winnerBox.classList.add('hidden');
+    winnerBox.innerHTML = '';
   }
-
   const results = $('reveal-results');
   if (results) {
-    results.innerHTML = reveal.rows.map((row, index) => {
-      const isWinner = reveal.winnerIds?.includes(row.player.id);
-      const medal = getMedal(row, round);
-      let detail = '';
-      if (mode.input === 'number') {
-        const value = row.value === null ? 'Sin respuesta' : euros(row.value);
-        const diffText = row.value === null ? '—' : `${row.over ? '+' : '−'}${euros(row.diff).replace('-', '')}`;
-        detail = `<p class="text-xs text-emerald-100/45">Apuesta: <span class="font-bold text-emerald-100/80">${value}</span></p><p class="font-black ${isWinner ? 'text-market-yellow' : 'text-emerald-100/80'}">${diffText}</p>`;
-      } else if (mode.input === 'choice') {
-        detail = `<p class="text-xs text-emerald-100/45">Eligió: <span class="font-bold text-emerald-100/80">${escapeHTML(answerLabel(row.answer, round))}</span></p><p class="font-black ${row.correct ? 'text-market-yellow' : 'text-market-red'}">${row.correct ? 'Correcto' : 'Falló'}</p>`;
-      } else {
-        detail = `<p class="text-xs text-emerald-100/45 line-clamp-2">${escapeHTML(answerLabel(row.answer, round))}</p><p class="font-black ${row.correct ? 'text-market-yellow' : 'text-emerald-100/80'}">Distancia: ${Number.isFinite(row.distance) ? row.distance : '—'}</p>`;
-      }
-      return `<div class="${isWinner ? 'winner-card bg-brand/20 border-brand-light/40' : 'panel'} rounded-2xl p-3 flex items-center gap-3 border ${isWinner ? '' : 'border-white/10'}" style="animation-delay:${index * 60}ms">
-        ${playerAvatar(row.player)}
-        <div class="min-w-0 flex-1">
-          <p class="font-black truncate">${escapeHTML(row.player.username)} ${String(row.player.id) === sid() ? '<span class="text-xs text-brand-light">Tú</span>' : ''}</p>
-          ${detail}
-        </div>
-        <div class="text-right min-w-[110px]">
-          <p class="text-2xl">${medal?.icon || '✨'}</p>
-          <p class="text-[11px] font-black uppercase leading-tight ${medal?.tone || 'text-emerald-100/60'}">${escapeHTML(medal?.label || '')}</p>
-        </div>
-      </div>`;
-    }).join('');
+    results.classList.add('hidden');
+    results.innerHTML = '';
   }
+  $('reveal-action-bar')?.classList.add('hidden');
 
-  $('next-round-button')?.classList.toggle('hidden', !state.isHost);
-  $('guest-next-wait')?.classList.toggle('hidden', state.isHost);
+  scheduleRevealStep(() => {
+    $('reveal-kicker') && ($('reveal-kicker').textContent = round.mode === 'basket' ? 'El precio total es' : mode.input === 'number' ? 'El precio real es' : 'Respuesta correcta');
+    const price = $('reveal-price');
+    if (price) {
+      price.textContent = revealFinalValue(round, mode);
+      price.classList.remove('reveal-suspense');
+      price.classList.add('reveal-mega');
+    }
+    $('round-rule') && ($('round-rule').textContent = mode.numeric ? (state.settings.justo ? 'Precio justo' : 'Más cercano') : round.subtitle);
+    launchConfetti('confetti-container', 55);
+  }, 1150);
+
+  scheduleRevealStep(() => {
+    const placement = ownRevealPlacement(reveal);
+    const winners = state.players.filter(player => reveal.winnerIds?.includes(player.id));
+    const ownMedal = placement ? getMedal(placement.row, round) : null;
+    const box = $('winner-box');
+    if (box) {
+      box.classList.remove('hidden');
+      box.classList.add('podium-card');
+      box.innerHTML = placement ? `
+        <p class="text-xs text-brand-light font-black uppercase tracking-widest">Has quedado en el puesto</p>
+        <div class="text-6xl my-2">${placement.position === 1 ? '👑' : ownMedal?.icon || '🏁'}</div>
+        <p class="text-5xl font-black text-gradient">${placementLabel(placement.position)}</p>
+        <p class="text-sm text-emerald-100/65 mt-2">${placement.position === 1 ? '¡Has ganado esta ronda!' : `Ganan ${winners.map(player => escapeHTML(player.username)).join(' + ') || '—'}`}</p>
+        <p class="text-xs text-emerald-100/45 mt-1">${ownMedal?.label || ''}${reveal.nadieSinPasarse ? ' · todos se pasaron' : ''}</p>
+      ` : `
+        <p class="text-xs text-brand-light font-black uppercase tracking-widest">Ganador${winners.length > 1 ? 'es' : ''}</p>
+        <div class="text-5xl my-2">${winners.length > 1 ? '🤝' : '👑'}</div>
+        <p class="text-3xl font-black text-gradient">${winners.map(player => escapeHTML(player.username)).join(' + ') || 'Sin ganador'}</p>
+        <p class="text-xs text-emerald-100/55 mt-2">+3 puntos${reveal.nadieSinPasarse ? ' · todos se pasaron' : ''}</p>
+      `;
+    }
+    $('round-rule') && ($('round-rule').textContent = placement ? `Has quedado en el puesto ${placementLabel(placement.position)}` : 'Ganadores desvelados');
+    if (placement?.position === 1) launchConfetti('confetti-container', 90);
+  }, 2450);
+
+  scheduleRevealStep(() => {
+    $('reveal-medal-summary') && ($('reveal-medal-summary').textContent = 'Resultados y puntos');
+    renderRevealResultsList(reveal);
+    $('reveal-results')?.classList.remove('hidden');
+    $('reveal-action-bar')?.classList.remove('hidden');
+    $('next-round-button')?.classList.toggle('hidden', !state.isHost);
+    $('guest-next-wait')?.classList.toggle('hidden', state.isHost);
+    state.revealAnimationDone = true;
+  }, 3650);
 }
 
 function renderFinal() {
