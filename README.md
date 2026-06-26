@@ -7,21 +7,38 @@ Juego multijugador web para adivinar el precio de artículos de Mercadona, inspi
 - SPA en `index.html` con Tailwind por CDN.
 - `js/GameAPI.js` usando `https://alon.one/juegos/api`.
 - `js/mercaprecios.js` con salas, jugadores, estado compartido, IttySockets y fallback por polling.
-- Carga del catálogo real desde `data/products.json` del propio repositorio `jalonsomerchan/mercaprecios`.
-- Carga de categorías desde `data/categories.json`; si faltan, las genera a partir de `top_category`.
+- Carga del catálogo real desde `data/products.json`.
+- Carga de categorías desde `data/categories.json`.
+- Scraper automático en `scripts/update-catalog.mjs` para actualizar datos desde `https://datania.github.io/mercadona-catalog/index.html`.
+- Workflow `.github/workflows/update-catalog.yml` para actualizar el catálogo con GitHub Actions.
+- Workflow `.github/workflows/pages.yml` para desplegar en GitHub Pages.
+- `.nojekyll` para servir correctamente archivos y carpetas estáticas.
 
-## Importante sobre los datos
+## Despliegue en GitHub Pages
 
-Este ZIP no incluye `data/products.json` ni `data/categories.json` para no sobrescribir los ficheros reales que ya existen en el repositorio.
+El repositorio publica la raíz del proyecto como sitio estático cada vez que se hace push a `main`.
+
+En GitHub Pages deja la configuración así:
+
+- **Source:** GitHub Actions
+- **Branch:** no hace falta elegir rama, lo gestiona el workflow
+
+URL esperada:
+
+```txt
+https://jalonsomerchan.github.io/mercaprecios/
+```
+
+## Datos
 
 El juego carga directamente:
 
 ```txt
-/data/products.json
-/data/categories.json
+data/products.json
+data/categories.json
 ```
 
-El formato soportado es el que ya tiene el repo:
+El formato soportado es:
 
 ```json
 {
@@ -37,18 +54,61 @@ El formato soportado es el que ya tiene el repo:
 
 También acepta variantes como `display_name`, `price_instructions.unit_price`, `image`, `image_url` o `share_url`, pero la fuente principal es `data/products.json`.
 
-## Subida a GitHub
+## Actualización automática del catálogo
 
-Copia estos archivos en la raíz del repositorio `jalonsomerchan/mercaprecios`, manteniendo la carpeta `/data` actual:
+El workflow `Update Mercadona catalog` se ejecuta cada día a las 05:17 UTC y también se puede lanzar manualmente desde la pestaña **Actions**.
 
-```txt
-index.html
-js/GameAPI.js
-js/mercaprecios.js
-README.md
+El proceso hace lo siguiente:
+
+1. Descarga `https://datania.github.io/mercadona-catalog/index.html`.
+2. Busca arrays de productos y categorías dentro de los scripts inline o externos de la página.
+3. Normaliza productos y categorías.
+4. Valida que los datos sean coherentes.
+5. Solo escribe `data/products.json` y `data/categories.json` si todo pasa la validación.
+6. Solo hace commit si esos archivos cambian.
+
+Validaciones principales:
+
+- mínimo de productos y categorías;
+- `id`, `name`, `top_category` y `price` válidos;
+- precios positivos y dentro de rango razonable;
+- ids de producto no duplicados;
+- mayoría de productos con imagen y URL;
+- categorías no duplicadas;
+- conteos de categorías coincidentes con los productos.
+
+Si cualquier comprobación falla, la action termina con error antes de escribir archivos, así que no se actualiza nada.
+
+Ejecución local:
+
+```bash
+node scripts/update-catalog.mjs --dry-run
+node scripts/update-catalog.mjs
 ```
 
-No borres ni sustituyas `/data/products.json`.
+Variables opcionales:
+
+```bash
+CATALOG_SOURCE_URL="https://datania.github.io/mercadona-catalog/index.html"
+MIN_PRODUCTS=500
+MIN_CATEGORIES=5
+PRICE_MIN=0.01
+PRICE_MAX=1000
+```
+
+## Desarrollo local
+
+Abre el proyecto con un servidor local para que `fetch()` pueda leer los JSON:
+
+```bash
+python3 -m http.server 8080
+```
+
+Después visita:
+
+```txt
+http://localhost:8080/
+```
 
 ## Diseño móvil compacto
 
